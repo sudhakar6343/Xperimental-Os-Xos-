@@ -1,0 +1,99 @@
+alias physp S0;
+physp=([PTBR+(SP/512)*2]*512)+(SP%512);
+
+
+
+alias arg1 S1;
+alias arg2 S2;
+alias syscall S3;
+alias fileindex S5;
+alias fatindex S6;
+alias filesize S7;
+
+arg1=[physp-3];//new lseek,word to read
+arg2=[physp-4];//file descriptor
+syscall=[physp-1];
+
+
+if(syscall==6) then
+   if(!(arg2>=0 && arg2<8)) then
+      [physp-2]=-1;
+      ireturn;
+   endif;
+
+  
+   alias pcb S4;
+   pcb=READY_LIST + ((PTBR-1024)/8)*32+15+arg2*2;
+
+   if([pcb]==-1) then
+      [physp-2]=-1;
+      ireturn;
+   endif;
+
+   alias  lseek  S8;
+   lseek=[pcb+1];
+   
+   fileindex=[pcb+15];
+
+
+   fatindex=[FILE_TABLE+fileindex*2];
+
+ 
+   filesize=[FAT+fatindex*8+1];
+
+   if(arg1+lseek>=0 && arg1+lseek<filesize) then
+      [physp-2]=0;
+      if(arg1==0) then
+      [pcb+1]=0;
+      else
+      [pcb+1]=arg1+lseek;
+      endif;
+   else
+      [physp-2]=-1;
+   endif;
+   ireturn;
+endif;
+
+if(syscall==7) then
+
+
+   if(!(arg2>=0 && arg2<8)) then
+      [physp-2]=-1;
+      ireturn;
+   endif;
+
+   alias pcb S4;
+   pcb=READY_LIST + ((PTBR-1024)/8)*32;
+
+   alias ppo S9;
+   ppo=pcb+15+arg2*2;
+   if([ppo]==-1) then
+      [physp-2]=-1;
+      ireturn;
+   endif;
+
+    fileindex=[ppo];
+
+
+   fatindex=[FILE_TABLE+fileindex*2];
+
+
+   filesize=[FAT+fatindex*8+1];
+
+   alias lseek S8;
+   lseek=[ppo+1];
+  
+   if(lseek==filesize) then
+    [physp-2]=-1;
+    ireturn;
+   endif;
+  
+   load(1,[FAT+fatindex*8+2]);
+   load(1,[512+lseek/512]);
+   [ppo+1]=lseek+1;
+   [physp-3]=[512+lseek%512]; 
+   [physp-2]=0;
+   ireturn;
+ endif;
+
+    

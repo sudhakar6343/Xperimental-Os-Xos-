@@ -1,0 +1,214 @@
+alias physp S0;
+alias pid S10;
+alias counter S11;
+alias temp2 S12;
+alias it S1;
+alias temp S2;
+alias pcb S5;
+alias fileindex S3;
+alias opencount S4;
+
+physp=[PTBR+2*(SP/512)]*512+(SP%512);
+
+if([physp-1]==10) then
+  
+    //checking all the pcb for state 1
+ 
+    it=0;
+   
+    temp=(PTBR-1024)/8;
+
+    while(it<32) do                              //processes waiting for the present process
+        if([READY_LIST+ it*32+1]== (temp + 100) ) then
+           [READY_LIST + it*32 +1]=1;
+        endif;
+        it=it+1;
+    endwhile;
+
+
+    //removing the process
+
+   
+    
+    pcb=READY_LIST+ ((PTBR-1024)/8)*32;
+    [pcb+1]=0;
+
+    //closing all the files opened by the current process
+    it=0;
+    pcb=pcb+15;
+    while(it<8) do
+       temp=pcb+it*2;
+       if([temp]!=-1) then
+           fileindex=[temp];
+           [temp]=-1;
+           [temp+1]=-1;
+           temp=FILE_TABLE + fileindex*2;
+           opencount=[temp+1]-1;
+           if(opencount==0) then
+               [temp]=-1;
+           endif;
+           [temp+1]=opencount;
+       endif;
+        it=it+1;
+    endwhile;
+
+    //freeing pages used by the process
+    it=0;
+    while(it<3) do
+        temp=PTBR+it*2;
+     if([temp+1]=="01" || [temp+1]=="11") then
+        [1280+[temp]]=[1280+[temp]]-1;
+     endif;
+
+     if(([temp+1]=="00" || [temp+1]=="10") && [temp]>=448) then
+        [DISK_LIST+[temp]]=[DISK_LIST+[temp]]-1; 
+     endif;
+
+     [temp]=-1;
+     [temp+1]="00";
+     it=it+1;
+    endwhile;
+ 
+    
+    pid=(PTBR-1024)/8;      //setting up pcb
+    it=0;
+    temp=510;
+
+    while(temp<512)  do
+     load(1,temp);
+     it=0;
+       while(it<512) do 
+         if([512+it]==pid && [512+it+1]!=0) then
+           [512+it]=-1;
+            print("int8");
+           break;
+         endif;
+         it=it+32;
+       endwhile;
+    if(it!=512) then
+        break;
+    endif;
+    temp=temp+1;
+   endwhile;
+
+  if(it!=512) then 
+   
+    counter=0;
+    pcb=READY_LIST+pid*32;
+    temp2=512+it*32;
+   
+    while(counter<32) do
+       [pcb+counter]=[temp2+counter];
+       counter=counter+1;
+    endwhile;
+    [temp2+counter+1]=0;
+    [pcb+4]=[pcb+4];
+    store(1,temp);
+
+    load(1,509);         //setting up the page table
+    counter=0;
+    temp=512+it*8;
+    while(counter<6) do
+        [PTBR+counter]=[temp+counter];
+        counter=counter+1; 
+    endwhile;
+    print([PTBR+6]);
+    [DISK_LIST+[temp+6]]=0;
+   endif;
+
+   it=0;
+   counter=0;
+   while(it<32) do
+     if([READY_LIST+32*it+1]==1) then
+         counter=counter+1;
+     endif;
+    it=it+1;
+   endwhile; 
+
+   if(counter==0) then
+      halt;
+   endif;
+
+    store(5,19);
+
+    pcb=pid;
+    alias newpcb S6;
+
+    if(pcb==31) then
+       newpcb=0;
+    else
+       newpcb=pcb+1;
+    endif;
+
+    while(newpcb!=pcb) do               //setting up  the next process to execute
+        if([READY_LIST+ newpcb*32 + 1]==1) then
+           break;
+        endif;
+        if(newpcb==31) then
+           newpcb=0;
+        else
+           newpcb=newpcb+1;
+        endif;
+    endwhile;
+    newpcb=READY_LIST+ newpcb*32;
+    [newpcb+1]=2;
+    BP=[newpcb+2];
+    SP=[newpcb+3];
+    SP=SP+1;
+   PTBR= [newpcb+5];
+    PTLR=[newpcb+6];
+   R0= [newpcb+7];
+   R1= [newpcb+8];
+   R2= [newpcb+9];
+   R3= [newpcb +10 ];
+   R4= [newpcb + 11];
+   R5= [newpcb + 12];
+   R6= [newpcb + 13];
+   R7= [newpcb + 14];
+
+   temp=[PTBR+(SP/512)*2]*512+(SP%512);
+   [temp]=[newpcb+4];
+   ireturn;
+
+endif; 
+
+//wait system call
+if([physp-1]==13)  then
+    alias waitingpid S1;
+    alias waitingpcb S2;
+    alias pcb S3;
+    alias newpcb S4;
+    alias temp S5;
+
+
+    waitingpid=[physp-3];
+    waitingpcb=READY_LIST + waitingpid*32+1;
+    pcb=READY_LIST + (PTBR-1024)*4;
+
+    if([pcb+1]==waitingpid  || [waitingpcb]==0) then //if process is waiting for terminated or for itself
+       [physp-2]=-1;
+       ireturn;
+    endif;
+
+    [pcb+1]=100+waitingpid;
+
+    inline "JMP 4636";
+
+endif;
+
+
+if([physp-1]==14) then
+    
+    temp=(PTBR-1024)/8;
+
+    it=0;
+    while(it<32) do                              //processes waiting for the present process
+        if([READY_LIST+ it*32+1] == (temp+100)) then
+           [READY_LIST + it*32 +1]=1;
+        endif;
+        it=it+1;
+    endwhile;
+    
+    [physp-2]=0;
+    ireturn;
+endif;

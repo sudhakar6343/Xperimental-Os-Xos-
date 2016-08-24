@@ -1,0 +1,116 @@
+alias Vpagenum S0;
+alias cause S1;
+alias ip S2;
+alias it S3;
+alias temp2 S5;
+alias count1 S11;
+alias newp S4;
+alias temp S8;
+alias physp S9;
+alias c S10;
+
+
+
+cause=EFR % 10;
+Vpagenum=(EFR/10)%100;
+ip=EFR/1000;
+
+if(cause==0) then
+   if([PTBR+Vpagenum*2]==-1) then
+       
+       inline "JMP 11812";
+   endif;
+  
+   it=25;
+   while(it<64) do
+     if([1280+it]==0) then
+       [1280+it]=1;
+       break;
+     endif;
+     it=it+1;
+   endwhile;
+
+   if(it==64) then  //second chance page replacement algorithm
+       temp=PTBR+Vpagenum*2;
+       temp2=temp;
+       c=1;
+       while(c<=64) do
+          if((temp-1024)%8==6) then
+              c=c+1;
+              if(temp==1278) then
+                 temp=1024;
+              else
+                  temp=temp+2;
+              endif;
+              continue;
+          endif;
+          if([temp+1]=="01" && [1280+[temp]]==1) then
+                 count1=448;
+                 while(count1<512) do
+                    if([count1+DISK_LIST]==0) then
+                         [DISK_LIST+count1]=1;
+                         break;
+                     endif;
+                    count1=count1+1;
+                 endwhile;
+                 if(count1==512) then
+                     inline "JMP 11814";    
+                 endif;
+                 store([temp],count1);
+                if([temp2]>=448 && [temp2]<=511) then
+                     load([temp],[temp2]);
+                     [DISK_LIST+ [temp2]]=[DISK_LIST+ [temp2]]-1;
+                 else
+                     load([temp],[temp2]);
+                 endif;
+                [temp2]=[temp];
+                [temp2+1]="11";
+                [temp]=count1;
+                [temp+1]="00";            
+                SP=SP+1;
+                physp=[PTBR+(SP/512)*2]*512+(SP%512);
+                [physp]=ip;
+                ireturn;                 
+           else
+              if([temp+1]=="11" && [1280+[temp]]==1) then
+                 [temp+1]="01";
+               endif;
+           endif;
+          temp=temp+2;
+       endwhile;
+        inline "JMP 11894";    
+   else
+     temp=[PTBR+Vpagenum*2];
+     if(temp>=448 && temp<=511) then
+         [DISK_LIST+temp]=[DISK_LIST+temp]-1;
+     endif;
+     load(it,temp);
+     [PTBR+Vpagenum*2+1]="11";
+     [PTBR+Vpagenum*2]=it;
+     SP=SP+1;
+    physp=[PTBR+(SP/512)*2]*512+(SP%512);
+    [physp]=ip;
+    ireturn;
+   endif;
+
+else
+
+if(cause==1) then
+   print("Illegal Instruction");
+endif;
+
+if(cause==2) then
+   print("Illegal Memory Access");
+endif;
+
+if(cause==3) then
+   print("Arithmetic Exception");
+endif;
+
+if(cause==4) then
+   print("Illegal Operands");
+endif;   
+
+inline "JMP 11812";
+
+endif;

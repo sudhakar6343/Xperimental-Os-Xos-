@@ -1,0 +1,162 @@
+alias physp S0;
+alias it S1;
+alias temp S6;
+alias waitingpid S2;
+alias waitingpcb S3;
+alias pcb S4;
+alias newpcb S7;
+alias fileindex S8;
+alias opencount S9;
+  
+physp=[PTBR+2*(SP/512)]*512+(SP%512);
+
+
+if([physp-1]==10) then
+    breakpoint;
+    temp=(PTBR-1024)/8;
+    it=0;
+    while(it<32) do                              //processes waiting for the present process
+        if([READY_LIST+ it*32+1]== (temp + 100) ) then
+           [READY_LIST + it*32 +1]=1;
+        endif;
+        it=it+1;
+    endwhile;
+
+
+    it=0;
+    while(it<32) do 
+       if([READY_LIST+it*32+1]==1) then
+           break;
+       endif;
+       it=it+1;
+    endwhile;
+
+  
+    if(it==32) then
+       halt;
+    endif;
+
+    //removing the process
+
+ 
+    
+    pcb=READY_LIST+ temp*32;
+    [pcb+1]=0;
+
+    //closing all the files opened by the current process
+    it=0;
+    pcb=pcb+15;
+    while(it<8) do
+       temp=pcb+it*2;
+       if([temp]!=-1) then
+           fileindex=[temp];
+           [temp]=-1;
+           [temp+1]=-1;
+           temp=FILE_TABLE + fileindex*2;
+           opencount=[temp+1]-1;
+           if(opencount==0) then
+               [temp]=-1;
+           endif;
+           [temp+1]=opencount;
+       endif;
+        it=it+1;
+    endwhile;
+
+    //freeing pages used by the process
+    it=0;
+    while(it<4) do
+        temp=PTBR+it*2;
+     if([temp+1]=="01" || [temp+1]=="11") then
+        [1280+[temp]]=[1280+[temp]]-1;
+     endif;
+
+     if(([temp+1]=="00" || [temp+1]=="10") && [temp]>=448) then
+        [DISK_LIST+[temp]]=[DISK_LIST+[temp]]-1; 
+     endif;
+
+     [temp]=-1;
+     [temp+1]="00";
+     it=it+1;
+    endwhile;
+
+    store(6,20);
+
+    breakpoint;
+    pcb=(PTBR-1024)/8;
+    if(pcb==31) then
+       newpcb=0;
+    else
+       newpcb=pcb+1;
+    endif;
+
+    while(newpcb!=pcb) do               //setting up  the next process to execute
+        if([READY_LIST+ newpcb*32 + 1]==1) then
+           break;
+        endif;
+        if(newpcb==31) then
+           newpcb=0;
+        else
+           newpcb=newpcb+1;
+        endif;
+    endwhile;
+    newpcb=READY_LIST+ newpcb*32;
+    [newpcb+1]=2;
+    BP=[newpcb+2];
+    SP=[newpcb+3];
+    SP=SP+1;
+   PTBR= [newpcb+5];
+    PTLR=[newpcb+6];
+   R0= [newpcb+7];
+   R1= [newpcb+8];
+   R2= [newpcb+9];
+   R3= [newpcb +10 ];
+   R4= [newpcb + 11];
+   R5= [newpcb + 12];
+   R6= [newpcb + 13];
+   R7= [newpcb + 14];
+   temp=[PTBR+(SP/512)*2]*512+(SP%512);
+   [temp]=[newpcb+4];
+   ireturn;
+endif; 
+
+//wait system call
+if([physp-1]==13)  then
+    waitingpid=[physp-3];
+    waitingpcb=READY_LIST + waitingpid*32+1;
+    pcb=READY_LIST + (PTBR-1024)*4;
+    if([pcb+1]==waitingpid  || [waitingpcb]==0) then //if process is waiting for terminated or for itself
+       [physp-2]=-1;
+       ireturn;
+    endif;
+    [pcb+1]=100+waitingpid;
+    [pcb+2]=BP;
+    [pcb+3]=SP-1;
+    [pcb+4]=[physp];
+    [pcb+5]=PTBR;
+    [pcb+6]=PTLR;
+    [pcb+7]=R0;
+    [pcb+8]=R1;
+    [pcb+9]=R2;
+    [pcb+10]=R3;
+    [pcb+11]=R4;
+    [pcb+12]=R5;
+    [pcb+13]=R6;
+    [pcb+14]=R7;
+    inline "JMP 12170";
+endif;
+
+if([physp-1]==14) then
+        temp=(PTBR-1024)/8;
+
+    it=0;
+    while(it<32) do                              //processes waiting for the present process
+        if([READY_LIST+ it*32+1] == (temp+100)) then
+           [READY_LIST + it*32 +1]=1;
+        endif;
+        it=it+1;
+    endwhile;
+    
+    [physp-2]=0;
+    ireturn;
+endif;
+

@@ -1,0 +1,21 @@
+alias counter S0;
+alias n S1;
+
+print "Enter n ";
+read n;
+
+counter =0;
+
+while(n!=0) do
+    if(n%2!=0) then 
+       if(n!=3) then
+       counter=counter+1;
+       print n;
+       else
+         breakpoint;
+       endif;
+    endif;
+    n=n-1;
+endwhile;
+
+print counter;

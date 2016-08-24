@@ -1,0 +1,151 @@
+alias physicalSP S0;
+alias filename S1;
+alias counter S2;
+alias FAT_index S3;
+alias count_newprocess S4;
+alias count_oldprocess S5;
+alias count S6;
+alias temp S7;
+alias basic_block S8;
+alias currentPID S9;
+alias currentPCB S10;
+alias sys_index S11;
+alias sys_call S12;
+//print "int6";
+physicalSP = [PTBR + 2 * (SP / 512)] * 512 + (SP % 512);
+sys_call = [physicalSP - 1];
+if (sys_call == 9) then
+	filename = [physicalSP - 3];
+	counter = 0;
+	while (counter < 64) do
+		if ([FAT + (8 * counter)] == filename) then 
+			FAT_index = counter;
+			break;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	if (counter == 64) then
+		print "Not found";
+		[physicalSP - 2] = -1;
+		ireturn;
+	endif;
+	basic_block = [FAT + (FAT_index * 8) + 2];
+	load (1 , basic_block);
+	counter = 512;
+	count_oldprocess = 0;
+	count_newprocess = 0;
+	//print [counter];
+	while ([counter] != -1) do
+		count_newprocess = count_newprocess + 1;
+		counter = counter + 1;
+	endwhile;
+	counter = 0;
+	temp = 0;
+	while (counter < 64) do
+		if([MEM_LIST + counter] == 0) then
+			temp = temp + 1;
+		endif;
+		if (temp == count_newprocess + 1) then
+			break;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	if (counter == 64) then
+		[physicalSP - 2 ] = -1;
+		ireturn;
+	endif;
+	temp = 0;
+	counter = 0;
+	while (counter < 4) do
+		if (([PTBR + (counter * 2) + 1] == "01") || ([PTBR + (counter * 2) + 1] == "11")) then
+			[MEM_LIST + [PTBR + (counter * 2)]] = [MEM_LIST + [PTBR + (counter * 2)]] - 1;
+		endif;
+		counter = counter + 1;
+	endwhile;  
+	counter = 0;
+	while(counter < 3) do
+		count = 0;
+		if(temp == count_newprocess ) then
+			break;
+		else
+			while(count < 64) do
+				if([MEM_LIST + count] == 0) then
+					//print count;
+					[PTBR + counter*2] = count;
+					[PTBR + counter*2 + 1] = "01";
+					[MEM_LIST + count] = 1;
+					temp = temp + 1;
+					break;
+				endif;
+				count = count + 1;
+			endwhile;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	while(counter < 3) do
+		[PTBR + counter*2] = -1;
+		[PTBR + counter*2 + 1] = "00";
+		[MEM_LIST + [PTBR + counter*2]] = [MEM_LIST + [PTBR + counter*2]] - 1;
+		counter = counter + 1;
+	endwhile;
+	count = 0;
+	while(count < 64) do
+		if([MEM_LIST + count] == 0) then
+			//print count;
+			[PTBR + counter*2] = count;
+			[PTBR + counter*2 + 1] = "01";
+			[MEM_LIST + count] = 1;
+			temp = temp + 1;
+			break;
+		endif;
+		count = count + 1;
+	endwhile;
+	counter = 512;
+	load (1, basic_block);
+	temp = 0;
+	while ([counter] != -1) do
+		while (temp < 4) do		
+			if ([PTBR + (2 * temp) + 1] == "01" || [PTBR + (2 * temp) + 1] == "11") then
+				load ([PTBR + (2 * temp)] , [counter]);
+				temp = temp + 1;
+				break;
+			endif;
+			temp = temp + 1;
+		endwhile;
+		counter = counter + 1;
+	endwhile;
+	//print temp;
+	//print counter;
+	counter = 15;
+	currentPID = (PTBR - 1024) / 8;
+	currentPCB = READY_LIST + (32 * currentPID);
+	while(counter < 31) do
+		if ([currentPCB + counter] != -1) then
+			sys_index = [currentPCB + counter];
+			[FILE_TABLE + (sys_index * 2) + 1] = [FILE_TABLE + (sys_index * 2) + 1] - 1;
+			if ([FILE_TABLE + (sys_index * 2) + 1] == 0) then
+				[FILE_TABLE + (sys_index * 2)] = -1;
+			endif;
+			[currentPCB + counter] = -1;
+			[currentPCB + counter + 1] = -1;
+		endif;
+		counter = counter + 2;
+	endwhile;
+	SP = 3 * 512;
+	physicalSP = [PTBR + 2 * (SP / 512)] * 512 + (SP % 512);
+	[physicalSP] = 0;
+	ireturn;	
+else
+	if (sys_call == 11) then
+		currentPID = (PTBR - 1024) / 8;
+		[physicalSP - 2] = currentPID;
+		//print "l";
+		ireturn;
+	else
+		currentPID = (PTBR - 1024) / 8;
+		currentPCB = READY_LIST + (32 * currentPID);
+		[physicalSP - 2] = [currentPCB + 31];
+		//print "kl";
+		ireturn;
+	endif;
+endif;

@@ -1,0 +1,99 @@
+load(25,21);//loading init code
+load(26,22);
+load(27,23);
+
+load(9,3);//loading timer interrupt
+load(10,4);
+
+load(13,7);//loading interrupt 2
+load(14,8);
+
+load(17,11);//loading interrupt 4
+load(18,12);
+
+load(11,5);//loading interrupt 1
+load(12,6);
+
+load (15,9);//loading interrupt 3
+load(16,10);
+
+load(19,13);//loading interrupt 5
+load(20,14);
+
+load(21,15);//loading interrupt 6
+load(22,16);
+
+load(23,17);//loading interrupt 7
+load(24,18);
+
+load(7,1);//exception handler
+load(8,2);
+
+load(5,19);//loading fat
+load(6,20);//loading disk free list
+
+//setting up the page table for init process
+
+PTBR=1024;
+PTLR=4;
+
+[PTBR + 0]=25;
+[PTBR + 1]="01";
+[PTBR + 2]=26;
+[PTBR + 3]="01";
+[PTBR + 4]=27;
+[PTBR + 5]="01";
+[PTBR + 6]=28;
+[PTBR + 7]="01";
+
+//setting up the memory free list
+alias it S0;
+
+it=0;
+while(it<=28) do
+  [1280+it]=1;
+  it=it+1;
+endwhile;
+
+it=29;
+while(it<=63) do
+  [1280+it]=0;
+  it=it+1;
+endwhile;
+
+//setting up the file system data structure (System wide open file table)
+it=0;
+while(it<128) do 
+  [FILE_TABLE + it]=-1;
+  [FILE_TABLE + it + 1]=0;
+  it=it+2;
+endwhile;
+
+
+//setting up the pcb for the init process
+
+
+[READY_LIST + 0]=0;
+[READY_LIST + 1]=2;
+
+
+//setting up the remaining pcbs with state 0
+ it=1;
+ while(it<32) do
+    [READY_LIST + it*32+1]=0;
+    it=it+1;
+ endwhile; 
+
+//setting up the perprocess open file table for init process
+it=0;
+while(it < 16) do 
+  [READY_LIST + 15 + it]=-1;
+  [READY_LIST + 15 + it + 1 ]=-1;
+  it=it+2;
+endwhile;
+
+[READY_LIST + 31]=0; //setting up the parent field in pcb of init process
+
+SP=3*512;
+[28*512]=0;
+ireturn;

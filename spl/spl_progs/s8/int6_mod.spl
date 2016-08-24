@@ -1,0 +1,137 @@
+alias physp S0;
+physp = [PTBR+2*(SP/512)]*512+(SP%512);
+
+alias filename S1;
+alias it S2;
+alias counter S3;
+alias temp S4;
+alias fileindex S5;
+alias pcb S6;
+alias bb S10;  
+alias it2 S9;
+
+if([physp-1]==9) then
+   filename=[physp-3];
+    
+    
+    it=0;
+    while(it<64) do                //perform actions to check filename exists or not
+       if([FAT+it*8]==filename) then
+           bb=[FAT+it*8+2];
+           break;
+       endif;
+       it=it+1;
+    endwhile;
+    
+    if(it==64) then
+      [physp-2]=-1;
+      ireturn;
+    endif;
+  
+
+    it=0;
+    counter=510;
+    while(counter<512)  do
+     load(1,counter);
+     it=0;
+       while(it<16) do 
+         if([512+it*32+1]==0) then
+           break;
+         endif;
+         it=it+1;
+       endwhile;
+     if(it!=16) then
+        break;
+      endif;
+    counter=counter+1;
+   endwhile;
+   //print("exec");
+
+   pcb=READY_LIST+ ((PTBR-1024)/8)*32;     //storing pcb
+   temp=0;
+   while(temp<32) do
+       [512+it*32+temp]=[pcb+temp];
+       temp=temp+1;
+   endwhile;
+   [512+it*32+1]=1;
+   [512+it*32+4]=[physp];
+   store(1,counter);
+
+   load(1,509);                           //storing page table
+   temp=512+it*8;
+   
+   counter=0;
+   while(counter<3) do 
+    [temp+counter*2]=[PTBR+counter*2];
+    [temp+counter*2+1]=[PTBR+counter*2+1];
+    counter=counter+1;
+   endwhile;
+
+   counter=448;                             //for stack
+   while(counter<=511) do 
+      if([DISK_LIST+counter]==0) then
+         [DISK_LIST+counter]=1;
+          break;
+      endif;
+      counter=counter+1;
+   endwhile;
+
+   store([PTBR+6],counter);
+   [temp+6]=counter;
+   store(1,509);
+
+
+    load(1,bb);
+    
+    it=0;                    //add disk blocks numbers to page table entries
+    temp=PTBR;
+    while(it<3) do
+       if([512+it]!=-1) then
+          [temp+it*2]=[512+it];
+       else
+          [temp+it*2]="-1";
+       endif;
+       [temp+it*2+1]="00";
+       it=it+1;
+    endwhile;    
+
+     [PTBR+7]="01";       //setting the stack entry as valid and not referenced
+  
+    
+   
+    
+    it=0;
+    
+   
+    alias counter S9;
+  
+    while(it<8) do               //clearing the pcb for new process
+        if([pcb+15+it*2]!=-1) then
+           counter=pcb+15+it*2;
+            [counter]=-1;
+            [counter+1]=-1;
+        endif;
+        it=it+1;
+    endwhile;
+
+   
+    SP=3*512;
+
+    physp= [PTBR+2*(SP/512)]*512+(SP%512);
+    [physp]=0;
+   
+    ireturn;
+        
+endif;
+
+if([physp-1]==11) then
+    it=(PTBR-1024)/8;
+    [physp-2]=it;
+    ireturn;    
+endif;
+
+if([physp-1]==12) then
+    it=[READY_LIST + (PTBR-1024)*4 + 31];
+    [physp-2]=it;
+    ireturn;
+endif;

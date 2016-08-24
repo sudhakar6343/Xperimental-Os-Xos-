@@ -1,0 +1,143 @@
+alias physp S0;
+physp=([PTBR+2*(SP/512)]*512)+(SP%512);
+
+alias syscall S1;
+syscall =[physp-1];
+
+alias arg1 S2;
+arg1=[physp-3];
+
+alias it S3;
+
+if(syscall==1) then
+     it=0;
+     while(it < 64*8) do 
+       if([FAT+it]==arg1) then
+         [physp-2]=0; 
+         ireturn;
+       endif;
+       it=it+8;
+     endwhile;
+
+    it=24;
+     alias df S5;
+     df=6*512;
+     while(it<448) do 
+        if([df+it]==0) then
+          break;
+        endif;
+        it=it+1;
+     endwhile;
+
+
+
+    if(it==448) then
+       [physp-2]=-1;
+       ireturn;
+    endif;
+
+    alias  Bb S6;
+    Bb=it;
+
+   it=0;
+   while(it < 64*8) do 
+       if([FAT+it]==-1) then
+         [FAT+it]=arg1;
+         [FAT+it+1]=0;
+         [FAT+it+2]=Bb;
+         [df+Bb]=1;
+         load(1,Bb);
+         it=512;
+         while(it<1024) do
+            [it]=-1;
+            it=it+1;
+         endwhile;
+         store(1,Bb);
+         store(5,19);
+         store(6,20);         
+         [physp-2]=Bb;
+         ireturn;
+       endif;
+       it=it+8;
+    endwhile;    
+   
+   [physp-2]=-1;
+   ireturn;
+ 
+endif;
+
+if(syscall == 4) then
+    //searching the fat for entry corresponding to given filename
+    alias fatindex S4;
+    it=0;
+    while(it<64) do
+      if([FAT + it*8]==arg1) then
+         fatindex=it;
+         break;
+      endif;
+    it=it+1;
+    endwhile;
+
+    if(it==64) then
+      [physp-2]=-1;
+      ireturn;
+    endif;
+
+    //searching the system wide open file table for any open instances of the given file
+    it=0;
+    while(it<64) do
+      if([FILE_TABLE+it*2]==fatindex) then
+        [physp-2]="-1";
+        ireturn;
+      endif;
+     it=it+1;
+    endwhile;
+
+    //deleting the file by clearing data blocks and basic block and updating file data structures
+    alias bb S5;//for basic block number
+    bb=[FAT+ fatindex*8 +2];
+
+    alias it2 S6; 
+    it2=0;
+    alias db S7;
+
+  while(1) do
+    load(1,bb);
+    db=[512+it2]; 
+    if(db!=-1) then
+       load(1,db);
+       it=0;
+       while(it<512) do //clearing the complete block;
+         [512+it]="";
+         it=it+1;
+       endwhile;
+       store(1,db);
+       [DISK_LIST+db]=0;
+       it2=it2+1;
+    else
+       break;
+    endif;
+  endwhile;  
+  
+  it=0;
+  load(1,bb);
+  while(it<512) do
+    [512+it]="";
+    it=it+1;
+  endwhile;  
+  [DISK_LIST + bb ]=0;
+  store(1,bb);
+
+  alias temp S9;
+  temp=FAT + fatindex*8 ;
+  [temp]=-1;
+  [temp+1]=0; 
+  [temp+ 2]=-1;
+  store(5,19);
+  store(6,20);
+  
+  [physp-2]=0;
+  ireturn;
+
+endif; 
+

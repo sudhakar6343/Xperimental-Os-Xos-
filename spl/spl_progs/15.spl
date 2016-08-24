@@ -1,0 +1,106 @@
+alias counter S0;
+alias PCB_index S1;
+alias physicalSP S3;
+alias count S4;
+alias temp S5;
+alias PTBR_child S6;
+alias currentPCB S7;
+alias currentPID S8;
+alias physicalSP_child S9;
+//print "int5";
+breakpoint;
+physicalSP = [PTBR + ((SP / 512)*2)] * 512 + (SP % 512);
+counter = 0;
+while(counter < 32) do
+	if([READY_LIST + (counter * 32) + 1] == 0) then
+		PCB_index = counter;
+		break;
+	endif;
+	counter = counter + 1;
+endwhile;
+if(counter == 32) then
+	[physicalSP - 2] = -1;
+	ireturn;
+endif;
+[READY_LIST + (PCB_index* 32)] = PCB_index;
+//print PCB_index;
+counter = 0;
+count = 0;
+
+temp = 0;
+
+while(count < 64) do
+	if ([MEM_LIST + count] == 0) then
+		break;
+	endif;
+	count = count + 1;
+endwhile;
+breakpoint;
+if (count == 64) then
+	//print "ko";
+	[physicalSP - 2 ] = -1;
+	ireturn;
+endif;
+PTBR_child = (PCB_index * 8) + 1024; 
+counter = 0;
+while (counter < 3) do
+	if ([PTBR + (counter*2) + 1] == "01" || [PTBR + (counter*2) + 1] == "11") then
+		
+		[PTBR_child + (counter*2)] = [PTBR + (counter * 2)];
+		[PTBR_child + (counter*2) + 1] = "01"; 
+		[MEM_LIST + [PTBR + (counter * 2)]] = [MEM_LIST + [PTBR + (counter * 2)]] + 1; 
+				
+	else
+		[PTBR_child + (counter*2)] = -1;
+		[PTBR_child + (counter*2) + 1] = "00"; 
+	endif;
+	counter = counter + 1;
+endwhile;
+[PTBR_child + (counter * 2)] = count;
+[PTBR_child + (counter*2) + 1] = "01"; 
+[MEM_LIST + count] = 1;
+temp = count*512;
+count = 0;
+while(count < 512) do
+	[temp + count] = [([PTBR + (counter * 2)] * 512) + count];
+	count = count + 1;
+endwhile;
+breakpoint;
+
+counter = READY_LIST + (PCB_index * 32);
+[counter + 5] = PTBR_child;
+[counter + 4] = [physicalSP];
+[counter + 3] = SP - 1;
+[counter + 2] = BP;
+[counter + 7] = R0;
+[counter + 6] = PTLR;
+[counter + 8] = R1;
+[counter + 9] = R2;
+[counter + 10] = R3;
+[counter + 11] = R4;
+[counter + 12] = R5;
+[counter + 13] = R6;
+[counter + 14] = R7;
+counter = 15;
+currentPID = (PTBR - 1024) / 8;
+currentPCB = READY_LIST + (currentPID * 32);
+while(counter < 31) do
+	if([currentPCB + counter] != -1) then
+		[PCB_index + counter] = [currentPCB + counter] ;
+		[PCB_index + counter + 1] = [currentPCB + counter + 1] ;
+		[FILE_TABLE + [PCB_index + counter] + 1] =[FILE_TABLE + [PCB_index + counter] + 1];
+	endif;
+	counter = counter + 2;
+endwhile;
+breakpoint;
+[READY_LIST + (PCB_index*32) + 1] = 1;
+[READY_LIST + (PCB_index*32) + 31] = currentPID;
+[physicalSP - 2] = PCB_index;
+physicalSP_child = [PTBR_child + ((SP - 1)/512) * 2] * 512 + ((SP - 1) % 512);
+[physicalSP_child - 1] = -2;
+//print PCB_index;
+//print PTBR_child;
+//print [PTBR_child];
+//print [PTBR_child + 1];
+//print "ret";
+ireturn;

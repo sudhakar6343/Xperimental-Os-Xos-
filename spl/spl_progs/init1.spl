@@ -1,0 +1,63 @@
+alias pSP S0;
+pSP=([PTBR+ 2 *(SP/512)]*512)+(SP % 512); 
+
+alias filename S1;
+filename=[pSP-3];
+
+alias fat S3;
+fat=5*512;
+
+alias it S2;
+
+it=0;
+
+while(it<64*8) do 
+  if([fat+it]==filename) then
+    [pSP-2]=0;
+    ireturn;
+  endif;
+  it=it+8;
+endwhile;
+
+it=24;
+
+while(it<448) do
+  if([DISK_LIST+it]==0) then
+    break;
+  endif;
+  it=it+1;
+ endwhile;
+
+if(it==448) then
+   [pSP-2]=-1;
+   ireturn;
+ endif;
+
+ alias bb S5;
+ bb=it;
+
+ it=0;
+
+ while(it<64*8) do
+    if([fat+it]==-1) then
+       [fat+it]=filename;
+       [fat+it+1]=0;
+       [fat+it+2]=bb;
+       load(1,bb);
+       it=512;
+       while(it<=765) do
+         [it]=-1;
+         it=it+1;
+       endwhile;
+       [DISK_LIST+bb]=1;
+       store(1,bb);
+       store(5,19);
+       store(6,20);
+       [pSP-2]=bb;
+       ireturn;
+    endif;
+    it=it+8;
+ endwhile;   
+
+ [pSP-2]=-1;
+ ireturn;

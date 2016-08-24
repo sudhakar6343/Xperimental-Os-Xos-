@@ -1,0 +1,83 @@
+alias physp S0;
+physp=([PTBR+2*(SP/512)]*512)+(SP%512);
+
+alias syscall S1;
+syscall =[physp-1];
+
+alias arg1 S2; //word to write
+arg1=[physp-3];
+
+alias arg2 S4; //file descriptor
+arg2=[physp-4];
+
+alias it S5;
+
+
+if(syscall==5) then
+    if(!(arg2 >=0 && arg2 <8)) then
+       [physp-2]=-1;
+       ireturn;
+    endif;
+    
+    alias pcb S6;
+    pcb=READY_LIST + ((PTBR-1024)/512)*32;
+    it=0;
+    if([pcb+15+arg2*2]==-1) then
+        [physp-2]=-1;
+       ireturn;
+    endif;
+  
+    alias fileindex S7;
+    fileindex=[pcb+15+arg2*2];
+
+    alias lseek S9;
+    lseek=[pcb+15+arg2*2+1];
+
+    alias fatindex S8;
+    fatindex=[FILE_TABLE+fileindex*2];
+
+    alias bb S10;
+    bb=[FAT+fatindex*8+2];
+
+    load(1,bb);//loading the basic block to scatch pad
+   
+    if(lseek/512 > 255) then
+       [physp-2]=-1;
+       ireturn;
+    endif;
+
+    if([512+lseek/512]==-1) then
+         it=25;
+         while(it<448) do
+           if([DISK_LIST + it]==0) then
+              [DISK_LIST + it ]=1;
+              [512+lseek/512]=it;
+              store(1,bb);
+              load(1,it);
+              [512+lseek%512]=arg1;
+              store(1,it);
+              [pcb + 15 +arg2*2 + 1]=lseek+1;
+              [FAT+fatindex*8+1]=[FAT+fatindex*8+1]+512;
+              store(5,19);
+              store(6,20);
+              [physp-2]=0;
+              ireturn;
+            endif;
+            it=it+1;
+         endwhile;   
+         if(it==448) then
+           [physp-2]=-1;
+           ireturn;
+         endif;
+    else
+        it=[512+lseek/512];
+        load(1,it);
+        [512+lseek%512]=arg1;
+        store(1,it);
+       
+        [pcb + 15 +arg2*2 + 1]=lseek+1;
+        [physp-2]=0;
+        ireturn;
+    endif;
+
+ endif;

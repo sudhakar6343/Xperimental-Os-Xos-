@@ -1,0 +1,108 @@
+alias physp S0;
+physp = [PTBR+2*(SP/512)]*512+(SP%512);
+
+alias filename S1;
+alias it S2;
+
+
+
+if([physp-1]==9) then
+   filename=[physp-3];
+    alias it S2;
+    alias bb S6;
+    alias it2 S7;
+    it=0;
+    while(it<64) do                //perform actions to check filename exists or not
+       if([FAT+it*8]==filename) then
+           bb=[FAT+it*8+2];
+           break;
+       endif;
+       it=it+1;
+    endwhile;
+    
+    if(it==64) then
+      [physp-2]=-1;
+      ireturn;
+    endif;
+  
+   
+    load(1,bb);
+
+    alias counter S3;
+    alias temp S4;
+   
+      
+    
+    it=0;    //deallocating the memory and swap pages used by the process
+     while(it<3) do
+         temp=PTBR+it*2;
+         if([temp+1]=="01" || [temp+1]=="11") then
+           [1280+[temp]]=[1280+[temp]]-1;
+         endif;
+
+         if(([temp+1]=="00" || [temp+1]=="10") && [temp]>=448) then
+          [DISK_LIST+[temp]]=[DISK_LIST+[temp]]-1; 
+         endif;
+        [temp]=-1;
+        [temp+1]="00";
+     it=it+1;
+     endwhile;
+
+    it=0;                    //add disk blocks numbers to page table entries
+    temp=PTBR;
+    while(it<3) do
+       if([512+it]!=-1) then
+          [temp+it*2]=[512+it];
+       else
+          [temp+it*2]="-1";
+       endif;
+       [temp+it*2+1]="00";
+       it=it+1;
+    endwhile;    
+
+     [PTBR+7]="01";       //setting the stack entry as valid and not referenced
+  
+    alias fileindex S3;
+    alias pcb S4;
+   
+    pcb=READY_LIST+ ((PTBR-1024)/8)*32;
+    it=0;
+    
+
+    alias counter S9;
+    
+    while(it<8) do               //closing all the files opened by the current process
+        if([pcb+15+it*2]!=-1) then
+           counter=pcb+15+it*2;
+            fileindex=[counter];
+            [counter]=-1;
+            [counter+1]=-1;
+            counter=FILE_TABLE+fileindex*2+1;
+            it2=[counter]-1;
+            [counter]=it2;
+            if(it2==0) then
+               [FILE_TABLE+fileindex*2]=-1;
+            endif;
+        endif;
+        it=it+1;
+    endwhile;
+
+   
+    SP=3*512;
+    physp= [PTBR+2*(SP/512)]*512+(SP%512);
+    [physp]=0;
+    ireturn;
+        
+endif;
+
+if([physp-1]==11) then
+    it=(PTBR-1024)/8;
+    [physp-2]=it;
+    ireturn;    
+endif;
+
+if([physp-1]==12) then
+    it=[READY_LIST + (PTBR-1024)*4 + 31];
+    [physp-2]=it;
+    ireturn;
+endif;

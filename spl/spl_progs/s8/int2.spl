@@ -1,0 +1,118 @@
+//get physical sp
+alias physp S0;
+physp= [PTBR+(SP/512)*2]*512+(SP%512);
+
+alias syscall S1;
+syscall=[physp-1];
+
+alias arg1 S2;
+arg1=[physp-3];
+
+alias it S3;
+
+if(syscall==2) then 
+   alias fatindex S4;
+   alias fileindex S5;
+   //searchig the fat entry for any file is there with arg1
+   it=0;
+   while(it<512) do
+     if([FAT+it]==arg1) then
+         fatindex=it/8;
+         break;
+     endif;
+     it=it+8;
+   endwhile;
+
+   if(it>=512) then
+      [physp-2]=-1;
+      ireturn;
+   endif;
+   
+   //searching for fatindex in system wide open file table
+   
+   it=0;
+   while(it < 128) do
+      if([FILE_TABLE + it]==fatindex) then
+          fileindex=it/2;
+          break;
+      endif;
+      it=it+2;
+    endwhile;
+
+    if(it>=128) then
+       it=0;
+       while(it < 128) do
+      if([FILE_TABLE + it]==-1) then
+          fileindex=it/2;
+          [FILE_TABLE + fileindex*2 +1]=1;
+          break;
+      endif;
+      it=it+2;
+    endwhile;
+    endif;
+   
+
+    if(it>=128) then
+     [physp-2]=-1;
+     ireturn;
+    endif;
+
+   
+    //getting pid from ptbr
+    alias currpcb S6;
+    currpcb=READY_LIST + ((PTBR-1024)/8)*32;
+   
+    alias temp S9;
+
+
+    //checking the pcb for any free entry
+    it=0;
+    while(it < 16) do 
+      if([currpcb+ 15 +it] ==-1) then
+            temp=currpcb + 15;
+            [ temp+ it]=fileindex;  
+            [temp + it + 1]=0;
+            temp=FILE_TABLE + fileindex*2;
+            [temp]=fatindex;
+            [temp +1]=[temp+1]+1;
+            [physp-2]=0;
+            ireturn;
+       endif;
+       it=it+2;
+    endwhile;
+
+    [physp-2]=-1;
+    ireturn;
+endif;   
+
+if(syscall == 3) then
+   if(!(arg1 >=0 && arg1 <8)) then //checking the validity of file descriptor
+      [physp-2]=-1;
+      ireturn;
+   endif;
+  
+   alias pcb S4;
+   pcb=READY_LIST + ((PTBR-1024)/8)*32;
+
+   alias fileindex S5;
+   fileindex=[pcb+15+arg1];
+   if([pcb+15+arg1]==-1) then
+     [physp-2]=-1;
+     ireturn;
+   else 
+      temp=FILE_TABLE + fileindex*2;
+      it=[temp + 1];
+      it=it-1;
+      if(it==0) then //updating the system wide open file table and invalidating the per process opne file
+         [temp + 1]=0;
+         [temp] = -1;
+         [pcb+15+arg1]=-1;
+         [physp-2]=0;
+         ireturn;
+      endif;
+      [temp +1] = it;
+      [pcb+15+arg1]=-1;
+      [physp-2]=0;
+      ireturn;
+   endif;  
+endif;

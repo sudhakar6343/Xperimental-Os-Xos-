@@ -1,0 +1,139 @@
+alias physp S0;
+physp=[PTBR+2*(SP/512)]*512+(SP%512);
+
+alias it S1;
+if([physp-1]==8) then
+    alias newpcb S2;
+    it=0;
+   
+    while(it<32) do                        //searching for a pcb with state 0
+        if([READY_LIST+32*it+1]==0) then
+           newpcb=it;                       //setting up the new pcb
+           [READY_LIST+32*it]=it;
+           break;
+         endif;
+        it=it+1;
+    endwhile;
+    
+    if(it==32) then
+        [physp-2]="-1";
+        ireturn;
+    endif;
+
+    alias count1 S3;
+    alias count2 S4;
+    alias newptbr S5;
+    alias newit S6;
+
+    count1=0;
+    count2=0;
+
+    it=0;
+
+    while(it<4) do               //counting the number of valid pages
+      if([PTBR+2*it]!=-1) then
+         count1=count1+1;
+      endif;
+       it=it+1;
+    endwhile;
+    
+    it=29;
+
+    while(it<64) do
+       if([1280+it]==0) then          //counting no of free pages in physical memory
+          count2=count2+1;
+       endif;
+       it=it+1;
+    endwhile;
+
+    if(!(count1 <=count2)) then
+         [physp-2]="-1";
+         ireturn;
+    endif;
+
+    alias temp S9;
+   
+    it=0;
+  
+    count2=29;
+     while(it<4) do                  //setting up the new pagetable
+      if([PTBR+2*it]!=-1) then
+         
+         while([1280+count2]!=0) do   //searching for a new free block in memory free list
+            count2=count2+1;
+         endwhile;
+         [1280+count2]=1;
+
+         count1=0;
+         while(count1<512) do
+           [count2*512+count1]=[[PTBR+it*2]*512+count1];
+           count1=count1+1;
+         endwhile;
+
+        
+         newptbr=1024+newpcb*8;
+         temp=newptbr+it*2;
+         [temp]=count2;
+         [temp+1]=[PTBR+it*2+1];
+         
+      else
+         temp=newptbr+it*2;
+         [temp]=-1;
+         [temp+1]="00";
+         
+      endif;
+       it=it+1;
+    endwhile;
+
+   
+    
+    it=READY_LIST+newpcb*32;
+    [it + 5]=newptbr;//setting up the ptbr value in newpcb
+    [it + 6]=4;//ptlr value
+    [it + 4]=[physp];//ip value
+    [it + 3]=SP-1; //sp
+    [it + 2]=BP;
+    [it + 7]=R0;
+    [it + 8]=R1;
+    [it + 9]=R2;
+    [it + 10]=R3;
+    [it + 11]=R4;
+    [it + 12]=R5;
+    [it + 13]=R6;
+    [it + 14]=R7;
+    [it+31]=(PTBR-1024)/8;
+    
+    //COPYING PER PROCESS OPEN FILE TABLE
+    count1=READY_LIST + ((PTBR-1024)/8)*32;
+    count2=15;
+    while(count2<31) do
+       [it+count2]=[count1+count2];
+       count2=count2+1;
+    endwhile;
+
+    //updating the system wide open file table
+    count1=0;
+    while(count1 < 8) do
+        if([it+15+count1*2]!=-1) then
+             [FILE_TABLE + [it+15+count1*2]*2+1]=[FILE_TABLE + [it+15+count1*2]*2+1]+1;
+        endif;
+        count1=count1+1;
+    endwhile;
+    
+    //state field for the newpcb
+    [it+1]=1;
+    [it]=newpcb;
+
+    //return value for parent process
+    [physp-2]=newpcb;    
+
+    //physical sp for the child process
+    alias newphysp S7;
+    newphysp=[newptbr+((SP-1)/512)*2]*512+((SP-1)%512);
+    [newphysp-1]=-2;
+
+    
+    ireturn;
+
+endif;
+

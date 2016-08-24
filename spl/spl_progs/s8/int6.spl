@@ -1,0 +1,157 @@
+alias physp S0;
+physp = [PTBR+2*(SP/512)]*512+(SP%512);
+
+alias filename S1;
+alias it S2;
+
+
+
+if([physp-1]==9) then
+   filename=[physp-3];
+    alias it S2;
+    alias bb S6;
+    it=0;
+    while(it<64) do                //perform actions to check filename exists or not
+       if([FAT+it*8]==filename) then
+           bb=[FAT+it*8+2];
+           break;
+       endif;
+       it=it+1;
+    endwhile;
+    
+    if(it==64) then
+      [physp-2]=-1;
+      ireturn;
+    endif;
+  
+    alias counter S3;
+    alias counter2 S4;
+    alias it2 S5;
+    alias temp S7;
+
+    load(1,bb);
+    it=0;
+    counter=0;
+
+    while(it<3) do              //counting the no.of data blocks in the new process
+        if([512+it]!=-1) then
+            counter=counter+1;
+        endif;
+        it=it+1;
+    endwhile;
+ 
+    counter2=0;
+
+    it=0;
+    while(it<3) do                   //counting the no.of valid pages in the existing process
+       if([PTBR+it*2]!=-1) then
+           counter2=counter2+1;
+       endif;
+       it=it+1;
+    endwhile;
+    
+
+    if(counter > counter2) then    //loading code of the new process
+        it=counter-counter2;
+        it2=25;
+        while(it2<64) do
+           if([1280+it2]==0) then
+              it=it-1;
+           endif;
+           it2=it2+1;
+        endwhile;
+
+        if(it>0) then
+           [physp-2]=-1;
+           ireturn;
+        endif;
+
+        it=0;
+        while(it<counter2) do
+            it2=[512+it];
+            load([PTBR+it*2],it2);
+            it=it+1;
+        endwhile;
+
+         it2=25;
+        while(it<counter)  do
+          
+            while(it2<64) do
+              if([1280+it2]==0) then
+                [1280+it2]=1;
+                break;
+              endif;
+              it2=it2+1;
+            endwhile;
+
+            
+            [PTBR+it*2]=it2;
+            load(it2,[bb+it]);
+            [PTBR+it*2+1]="01";
+
+            it=it+1;
+        endwhile;    
+
+    else
+
+        it=0;
+        while(it<counter) do
+            it2=[512+it];
+            load([PTBR+it*2],it2);
+            it=it+1;
+        endwhile;
+
+        while(it<counter2) do
+           it2=[PTBR+it*2];
+           [1280+it2]=0;
+           [PTBR+it*2]=-1;
+           [PTBR+it*2+1]="00";
+           it=it+1;
+        endwhile;
+
+    endif;
+    
+    alias fileindex S3;
+    alias pcb S4;
+   
+
+    pcb=READY_LIST+ ((PTBR-1024)/8)*32;
+    it=0;
+    
+
+    while(it<8) do               //closing all the files opened by the current process
+        temp=pcb+15+it*2;
+        if([temp]!=-1) then
+
+            fileindex=[temp];
+            [temp]=-1;
+            [temp+1]=-1;
+            temp=FILE_TABLE+fileindex*2;
+            it2=[temp+1]-1;
+            [temp+1]=it2;
+            if(it2==0) then
+               [temp]=-1;
+            endif;
+        endif;
+        it=it+1;
+    endwhile;
+
+   
+    SP=3*512;
+    physp= [PTBR+2*(SP/512)]*512+(SP%512);
+    [physp]=0;
+    ireturn;
+        
+endif;
+
+if([physp-1]==11) then
+    it=(PTBR-1024)/8;
+    [physp-2]=it;
+    ireturn;    
+endif;
+
+if([physp-1]==12) then
+    it=[READY_LIST + (PTBR-1024)*4 + 31];
+    [physp-2]=it;
+    ireturn;
+endif;
