@@ -1,0 +1,21 @@
+
+integer main()
+{
+    integer a;
+    a=Fork();
+    if(a==-2) then
+        print("I am a child process\n");
+        a=Getpid();
+        print(a);
+    endif;
+
+    if(a!=-2) then
+       print("I am parent");
+       a=Getpid();
+       print(a);
+    endif;
+       
+    a=Getpid();
+    print(a);
+    return 0;
+}

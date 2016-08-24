@@ -1,0 +1,24 @@
+integer main() {
+  integer a,b,pid;
+  pid=Fork();
+  if(pid==-2) then
+    b=Exec("odd2.xsm");    
+  else
+    a=0;
+    b=0;
+    while(b<50) do
+     b=b+1;
+    endwhile;
+    while(a<50) do
+     a=a+2;
+    b=Wait(1);
+     print(a);
+    b=Signal();
+   
+    
+    
+    endwhile;
+  endif;
+
+  return 0;
+}

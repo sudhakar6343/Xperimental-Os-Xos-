@@ -1,0 +1,15 @@
+integer main() {
+    integer fd1,fd2,a,b,v;
+    read(v);
+    a=Create("newfile1.dat");
+    if(a!=-1) then
+       fd1=Open("newfile1.dat");
+       b=1;
+       while(b<=1000) do
+          a=Write(fd1,b*v);
+          b=b+1;
+       endwhile;
+     endif;
+
+return 0;
+}
