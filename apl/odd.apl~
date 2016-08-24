@@ -1,0 +1,15 @@
+decl
+  integer a,b;
+enddecl
+
+integer main() {
+   a=1;
+   while(a<20) do
+     print(a);
+     a=a+2;
+     if(a==3) then
+      b=Signal();
+     endif;
+   endwhile;
+  return 0;
+}
