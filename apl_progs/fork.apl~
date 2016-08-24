@@ -1,0 +1,16 @@
+integer main()
+{
+	integer pid;
+	
+	pid = Fork();
+pid = Fork();
+pid = Fork();
+pid = Fork();
+pid = Fork();
+pid = Fork();
+
+  print(Getpid());
+       
+
+	return 0;
+}
